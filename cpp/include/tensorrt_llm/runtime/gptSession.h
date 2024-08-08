@@ -32,6 +32,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -219,6 +220,8 @@ public:
     //!    ```
     void generate(GenerationOutput& outputs, GenerationInput const& inputs, SamplingConfig const& samplingConfig,
         std::shared_ptr<GenerationProfiler> const generationProfiler = nullptr);
+
+    void refitEngine(std::vector<std::pair<std::string, nvinfer1::Weights>> refit_params);
 
 private:
     [[nodiscard]] bool useCudaGraphs()

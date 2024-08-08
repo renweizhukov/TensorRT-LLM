@@ -1184,6 +1184,11 @@ void GptSession::finalize(SizeType microBatchId)
     TLLM_LOG_TRACE("%s stop", __PRETTY_FUNCTION__);
 }
 
+void GptSession::refitEngine(std::vector<std::pair<std::string, nvinfer1::Weights>> refit_params)
+{
+    mRuntime->refitEngine(*mLogger, refit_params);
+}
+
 void GptSession::CudaGraphExecutor::create(cudaGraph_t const& graph)
 {
     TLLM_LOG_TRACE("%s start", __PRETTY_FUNCTION__);

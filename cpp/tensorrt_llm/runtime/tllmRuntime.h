@@ -70,6 +70,8 @@ public:
 
     bool executeContext(SizeType contextIndex) const;
 
+    void refitEngine(nvinfer1::ILogger& logger, std::vector<std::pair<std::string, nvinfer1::Weights>> refit_params);
+
     CudaStream const& getStream() const;
 
     BufferManager::CudaStreamPtr getStreamPtr()

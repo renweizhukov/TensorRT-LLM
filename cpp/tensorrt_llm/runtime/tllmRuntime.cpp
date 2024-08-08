@@ -217,6 +217,24 @@ void TllmRuntime::setOutputTensors(SizeType contextIndex, TensorMap& tensorMap)
     }
 }
 
+void TllmRuntime::refitEngine(
+    nvinfer1::ILogger& logger, std::vector<std::pair<std::string, nvinfer1::Weights>> refit_params)
+{
+    nvinfer1::ICudaEngine& engine = *(mEngine.get());
+    TLLM_CHECK_WITH_INFO(engine.isRefittable(), "Tried refitting engine without refit enabled");
+
+    nvinfer1::IRefitter* refitter = nvinfer1::createInferRefitter(engine, logger);
+    for (auto param : refit_params)
+    {
+        TLLM_CHECK_WITH_INFO(
+            refitter->setNamedWeights(param.first.c_str(), param.second, nvinfer1::TensorLocation::kHOST),
+            "Failed to refit %s", param.first.c_str());
+    }
+    TLLM_CHECK_WITH_INFO(refitter->refitCudaEngine(), "Refit failed!");
+
+    delete refitter;
+}
+
 CudaStream const& TllmRuntime::getStream() const
 {
     return *mStream;

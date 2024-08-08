@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include <map>
 #include <pybind11/cast.h>
 #include <pybind11/functional.h>
 #include <pybind11/operators.h>
@@ -43,6 +44,9 @@
 #include "tensorrt_llm/runtime/gptSession.h"
 #include "tensorrt_llm/runtime/memoryCounters.h"
 #include "tensorrt_llm/runtime/samplingConfig.h"
+
+#include <ATen/ATen.h>
+#include <torch/torch.h>
 
 namespace py = pybind11;
 namespace tb = tensorrt_llm::batch_manager;
@@ -329,7 +333,23 @@ PYBIND11_MODULE(TRTLLM_PYBIND_MODULE, m)
             [](tr::GptSession& self, tpr::GenerationOutput& outputs, tpr::GenerationInput const& inputs,
                 tr::SamplingConfig const& samplingConfig)
             { self.generate(*outputs.toTrtLlm(), *inputs.toTrtLlm(), samplingConfig); },
-            py::arg("outputs"), py::arg("inputs"), py::arg("sampling_config"));
+            py::arg("outputs"), py::arg("inputs"), py::arg("sampling_config"))
+        .def(
+            "refit_engine",
+            [](tr::GptSession& self, std::map<std::string, at::Tensor> refit_params, nvinfer1::DataType dtype)
+            {
+                std::vector<std::pair<std::string, nvinfer1::Weights>> param_map;
+                for (auto param : refit_params)
+                {
+                    nvinfer1::Weights trt_weight;
+                    trt_weight.type = dtype;
+                    trt_weight.count = param.second.numel();
+                    trt_weight.values = param.second.data_ptr();
+                    param_map.push_back({param.first, trt_weight});
+                }
+                self.refitEngine(param_map);
+            },
+            py::arg("refit_params"), py::arg("type"));
 
     py::enum_<tb::LlmRequestState_t>(m, "LlmRequestState")
         .value("REQUEST_STATE_UNKNOWN", tb::LlmRequestState_t::REQUEST_STATE_UNKNOWN)
