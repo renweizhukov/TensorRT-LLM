@@ -224,11 +224,39 @@ void TllmRuntime::refitEngine(
     TLLM_CHECK_WITH_INFO(engine.isRefittable(), "Tried refitting engine without refit enabled");
 
     nvinfer1::IRefitter* refitter = nvinfer1::createInferRefitter(engine, logger);
+    auto num_of_weights = refitter->getAllWeights(0, nullptr);
+    TLLM_LOG_INFO("refitter existing num_of_weights = %ld", num_of_weights);
+    const char** weight_names = new const char*[num_of_weights];
+    auto retrieved_num_of_weights = refitter->getAllWeights(num_of_weights, weight_names);
+    TLLM_LOG_INFO("================================================================");
+    for (auto weight_index = 0; weight_index < retrieved_num_of_weights; weight_index++)
+    {
+        auto weights_old = refitter->getNamedWeights(weight_names[weight_index]);
+        TLLM_LOG_INFO("For weight %ld with name %s: weight.type = %d", weight_index, weight_names[weight_index], weights_old.type);
+        TLLM_LOG_INFO("For weight %ld with name %s: weight.count = %ld", weight_index, weight_names[weight_index], weights_old.count);
+    }
+    TLLM_LOG_INFO("================================================================");
+    delete[] weight_names;
+
+
+    TLLM_LOG_INFO("refitter to-be-set num_of_weights = %ld", refit_params.size());
     for (auto param : refit_params)
     {
+        auto param_name = param.first.c_str();
+        auto weights_old = refitter->getNamedWeights(param_name);
+        TLLM_CHECK_WITH_INFO((weights_old.values != nullptr) || (weights_old.count > 0),
+            "Weights %s not found", param_name);
+        auto weights_new = param.second;
         TLLM_CHECK_WITH_INFO(
-            refitter->setNamedWeights(param.first.c_str(), param.second, nvinfer1::TensorLocation::kHOST),
-            "Failed to refit %s", param.first.c_str());
+            weights_old.count == weights_new.count,
+            "Weights count mismatch for %s: old = %ld, new = %ld", param_name, weights_old.count, weights_new.count);
+        TLLM_CHECK_WITH_INFO(
+            weights_old.type == weights_new.type,
+            "Weights type mismatch for %s: old = %d, new = %d", param_name, weights_old.type, weights_new.type);
+        TLLM_CHECK_WITH_INFO(
+            refitter->setNamedWeights(param_name, weights_new, nvinfer1::TensorLocation::kHOST),
+            "Failed to refit %s", param_name);
+        TLLM_LOG_INFO("Successfully refit %s", param_name);
     }
     TLLM_CHECK_WITH_INFO(refitter->refitCudaEngine(), "Refit failed!");
 
